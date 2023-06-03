@@ -4,13 +4,6 @@ from PySide2 import QtWidgets, QtCore
 from shiboken2 import wrapInstance
 
 
-"""
-TO-DO:
-- Script job for checking temp cc stack
-- logic for loading memory based on master cc group
-"""
-
-
 def main():
     ui = SpaceSwitcherUI()
     ui.show()
@@ -34,25 +27,19 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
         self.bake_down = False
 
         self.SpaceSwitcher = SpaceSwitcher()
-        self.temp_ctrl_rows = []
 
     def _create_script_jobs(self):
         """
         Class that creates script jobs, which allow the GUI to
-        react to user input that occurs in Maya
+        react to user input that occurs in Maya. In the future,
+        I'd like to implement more script jobs to update the GUI
+        in case of undoing, redoing, deleting, etc., but currently it just
+        supports updating the selection labels.
         """
         self.script_jobs = []
         self.sel_labels_sj = cmds.scriptJob(event=["SelectionChanged",
                                             self._update_sel_labels])
         self.script_jobs.append(self.sel_labels_sj)
-
-        self.update_on_undo_sj = cmds.scriptJob(
-            event=["Undo", self._update_tmp_cc_stack])
-        self.script_jobs.append(self.update_on_undo_sj)
-
-        self.update_on_undo_sj = cmds.scriptJob(
-            event=["Redo", self._update_tmp_cc_stack])
-        self.script_jobs.append(self.update_on_undo_sj)
 
     def closeEvent(self, event):
         """
@@ -66,11 +53,15 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
         event.accept()
 
     def _create_ui(self):
+        """Main GUI creation class which creates main layout and runs
+        all methods to build UI"""
         self.main_layout = QtWidgets.QVBoxLayout()
         self._add_params_form()
         self.setLayout(self.main_layout)
 
     def _update_sel_labels(self):
+        """Updates the selection labels to show the name of the selected
+        objects"""
         selections = cmds.ls(selection=True)
 
         if len(selections) == 0:
@@ -86,15 +77,9 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
             self.tc_ledit_l.setText(self.tr("[Too many selections!]"))
             self.tc_ledit_r.setText(self.tr("[Too many selections!]"))
 
-    @QtCore.Slot()
-    def _update_tmp_cc_stack(self):
-        """
-        Rebuilds each row of tmp_ccs in case of changes occuring in Maya
-        without use of the GUI
-        """
-        pass
-
     def _add_params_form(self):
+        """Adds all the secondary UI elements into a form layout underneath
+        the main layout"""
         self.form_layout = QtWidgets.QFormLayout()
         self._add_snap_tools_form()
         self._add_hline()
@@ -102,14 +87,16 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
         self._add_tmp_ctrl_options()
         self._add_hline()
         self._add_tmp_cc_panel()
+        self.main_layout.addLayout(self.form_layout)
 
     def _add_hline(self):
+        """Adds horizontal line to the form layout"""
         self.hline = QtWidgets.QFrame()
         self.hline.setFrameShape(QtWidgets.QFrame.HLine)
         self.form_layout.addRow(self.hline)
-        self.main_layout.addLayout(self.form_layout)
 
     def _add_snap_tools_form(self):
+        """Adds the top row snap utility"""
         self.snap_tools_row = QtWidgets.QHBoxLayout()
 
         self.loc_chkbx = QtWidgets.QCheckBox("Location", checked=True)
@@ -129,6 +116,8 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
                                 self.snap_tools_row)
 
     def _add_temp_ctrls_form(self):
+        """Adds the main temp control row, with the selection labels and
+        generate button"""
         self.temp_ctrls_row = QtWidgets.QHBoxLayout()
 
         self._add_temp_ctrls_sel_labels()
@@ -142,6 +131,9 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
                                 self.temp_ctrls_row)
 
     def _add_tmp_cc_panel(self):
+        """Adds the bottom manage controls panel, with the dropdown
+        QComboBox that holds all created temp controls as well as the
+        Delete and Bake Down buttons"""
         self.temp_ctrl_panel_hb = QtWidgets.QHBoxLayout()
         self.temp_ctrl_panel_cmb = QtWidgets.QComboBox()
         self.temp_ctrl_panel_cmb.setSizePolicy(
@@ -159,6 +151,8 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
                                 self.temp_ctrl_panel_hb)
 
     def _add_temp_ctrls_sel_labels(self):
+        """Adds the QLineEdit selection labels that show the currently
+        selected objects"""
         self.tc_ledit_l = QtWidgets.QLineEdit(readOnly=True)
         self.tc_ledit_l.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                       QtWidgets.QSizePolicy.Preferred)
@@ -176,11 +170,12 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
         self._update_sel_labels()
 
     def _add_tmp_ctrl_options(self):
+        """Creates the main QHBoxLayout for all the options/parameters"""
         self.tmp_cc_opt_hb = QtWidgets.QHBoxLayout()
 
         self._add_tmp_ctrl_const_type_options()
         self._add_tmp_ctrl_baking_options()
-        self._add_tmp_ctrl_shape_options()
+        self._add_cc_options()
 
         self.form_layout.addRow(self.tr("Temp CC Options: "),
                                 self.tmp_cc_opt_hb)
@@ -239,23 +234,24 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
 
         self.tmp_cc_opt_hb.addLayout(self.tmp_cc_opt_baking_vb)
 
-    def _add_tmp_ctrl_shape_options(self):
-        self.tmp_cc_opt_shape_form = QtWidgets.QFormLayout()
-        self.tmp_cc_opt_shape_form.setAlignment(QtCore.Qt.AlignTop)
+    def _add_cc_options(self):
+        """Adds the CC shape options, including shape, color, size,
+        and orientation"""
+        self._add_cc_shape_options()
+        self._add_cc_color_options()
+        self._add_cc_orient_options()
+        self._add_cc_scale_options()
 
-        self.tmp_cc_opt_shape_lbl = QtWidgets.QLabel("CC Options:")
-        self.tmp_cc_opt_shape_form.addRow(self.tmp_cc_opt_shape_lbl)
+        self.tmp_cc_opt_hb.addLayout(self.tmp_cc_opt_shape_form)
 
-        self.tmp_cc_opt_shape_type_cmb = QtWidgets.QComboBox()
-        self.tmp_cc_opt_shape_type_cmb.addItems(
-            ["Circle", "Diamond", "Square"])
-        self.tmp_cc_opt_shape_form.addRow("Shape: ",
-                                          self.tmp_cc_opt_shape_type_cmb)
-        self.tmp_cc_opt_shape_color_cmb = QtWidgets.QComboBox()
-        self.tmp_cc_opt_shape_color_cmb.addItems(
-            ["Pink", "Red", "Blue", "Green", "Yellow"])
-        self.tmp_cc_opt_shape_form.addRow("Color: ",
-                                          self.tmp_cc_opt_shape_color_cmb)
+    def _add_cc_scale_options(self):
+        self.tmp_cc_opt_shape_scale_spn = QtWidgets.QDoubleSpinBox(value=1.25)
+        self.tmp_cc_opt_shape_scale_spn.setSingleStep(0.25)
+        self.tmp_cc_opt_shape_scale_spn.setRange(0.25, 10)
+        self.tmp_cc_opt_shape_form.addRow("Scale: ",
+                                          self.tmp_cc_opt_shape_scale_spn)
+
+    def _add_cc_orient_options(self):
         self.tmp_cc_opt_shape_orient_hb = QtWidgets.QHBoxLayout()
         self.tmp_cc_opt_shape_orient_cmb = QtWidgets.QComboBox()
         self.tmp_cc_opt_shape_orient_cmb.addItems(
@@ -268,13 +264,26 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
             self.tmp_cc_opt_shape_orient_negative_chk)
         self.tmp_cc_opt_shape_form.addRow("Orientation: ",
                                           self.tmp_cc_opt_shape_orient_hb)
-        self.tmp_cc_opt_shape_scale_spn = QtWidgets.QDoubleSpinBox(value=1.25)
-        self.tmp_cc_opt_shape_scale_spn.setSingleStep(0.25)
-        self.tmp_cc_opt_shape_scale_spn.setRange(0.25, 10)
-        self.tmp_cc_opt_shape_form.addRow("Scale: ",
-                                          self.tmp_cc_opt_shape_scale_spn)
 
-        self.tmp_cc_opt_hb.addLayout(self.tmp_cc_opt_shape_form)
+    def _add_cc_color_options(self):
+        self.tmp_cc_opt_shape_color_cmb = QtWidgets.QComboBox()
+        self.tmp_cc_opt_shape_color_cmb.addItems(
+            ["Pink", "Red", "Blue", "Green", "Yellow"])
+        self.tmp_cc_opt_shape_form.addRow("Color: ",
+                                          self.tmp_cc_opt_shape_color_cmb)
+
+    def _add_cc_shape_options(self):
+        self.tmp_cc_opt_shape_form = QtWidgets.QFormLayout()
+        self.tmp_cc_opt_shape_form.setAlignment(QtCore.Qt.AlignTop)
+
+        self.tmp_cc_opt_shape_lbl = QtWidgets.QLabel("CC Options:")
+        self.tmp_cc_opt_shape_form.addRow(self.tmp_cc_opt_shape_lbl)
+
+        self.tmp_cc_opt_shape_type_cmb = QtWidgets.QComboBox()
+        self.tmp_cc_opt_shape_type_cmb.addItems(
+            ["Circle", "Diamond", "Square"])
+        self.tmp_cc_opt_shape_form.addRow("Shape: ",
+                                          self.tmp_cc_opt_shape_type_cmb)
 
     def _add_new_temp_ctrl_to_cmb(self):
         self.new_temp_cc_name = self.SpaceSwitcher.temp_controllers[-1]["name"]
@@ -308,13 +317,18 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
 
     @QtCore.Slot()
     def snap_tools_button(self):
+        """Uses the snap_to_selected() function, passing
+        the quick snap checkboxes as parameters."""
         snap_to_selected(loc=self.loc_chkbx.isChecked(),
                          rot=self.rot_chkbx.isChecked(),
                          scl=self.scl_chkbx.isChecked())
 
     @QtCore.Slot()
     def create_temp_ctrl(self):
-        cmds.undoInfo(openChunk=True)
+        """Creates the temporary controller through the SpaceSwitcher class,
+        which instantiates a TempControl object, stores it in memory to allow
+        for deleting/baking down, and creates the temp control in Maya. Also
+        handles selection errors."""
         if len(cmds.ls(selection=True)) < 1:
             cmds.warning("At least one object must be selected.")
             return None
@@ -323,6 +337,8 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
             return None
 
         self._get_temp_cc_user_params()
+
+        cmds.undoInfo(openChunk=True)
 
         self.SpaceSwitcher.create_new_temp_ctrl(
             loc=self.tmp_cc_loc, rot=self.tmp_cc_rot, scl=self.tmp_cc_scl,
@@ -353,7 +369,7 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
         Controls logic around selecting the location/rotation constraint
         checkbox. Basically, it doesn't make sense to use the aim
         constraint with a point or orient constraint, so this logic
-         auto prevents those combinations
+        auto prevents those combinations
         """
         if (self.tmp_cc_opt_type_loc_chk.isChecked()
                 or self.tmp_cc_opt_type_rot_chk.isChecked()):
@@ -361,9 +377,11 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
 
     @QtCore.Slot()
     def delete_temp_cc(self):
-        """Delete associated temp_cc in Maya as well as the associated
-        UI row in the Existing Temp CCs stack. Will bake original CC
-        back to curve if bake is True"""
+        """
+        Delete associated temp_cc in Maya, in the SpaceSwitcher class'
+        memory, and clears it from the Temp CCs QComboBox.
+        Will also bake original CC back to curve if bake is True
+        """
         selected_temp_cc = self.temp_ctrl_panel_cmb.currentText()
         for temp_cc in self.SpaceSwitcher.temp_controllers:
             if temp_cc["name"] == selected_temp_cc:
@@ -385,25 +403,7 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
 
 
 class TempControl():
-    """
-    Class for temp control objects:
-
-    properties:
-        parent: world or whatever transform name
-        controller: locator, control curve, control curve type
-        controller color index
-        type: aim space (orient)
-        group: transform name of group node
-
-    methods:
-        create_cc: options for different types, color
-        namespace: auto create appropriate namespace for objects/groups/
-        bake_animation: bake animation for given transform node,
-                        delete constraints as well?
-            ALWAYS used on the temp controller's animation curves when copying,
-            used on user input for the original cc
-
-    """
+    """Main class for instantiating and building temporary controllers"""
     def __init__(self, shape="circle", color="pink", size=1.25, orient="x",
                  loc=True, rot=True, scl=False, aim=False, smart_bake=False,
                  time_range="time slider", orient_negative=True):
@@ -428,7 +428,6 @@ class TempControl():
 
     def _make_namespace(self):
         """
-        CREATE MASTER GROUP FOR ALL CONTROLS AND JUST PUT STUFF IN THERE
         Used to generate object names with appropriate naming conventions
         while avoiding errors caused by duplicate names. Also allows
         for changing the naming conventions without breaking code.
@@ -461,6 +460,10 @@ class TempControl():
         self.child_object = selections[-1]
 
     def _create_cc_shape(self):
+        """
+        Handles all the options associated with the temp control curve
+        itself, including changing its color, size, and manipulating its shape
+        """
         valid_shapes = ("circle", "square", "diamond")
         if self.shape not in valid_shapes:
             raise ValueError("Shape parameter must be one of the following: "
@@ -646,9 +649,9 @@ class TempControl():
     def _set_tmp_cc_size(self):
         """
         Sets the size of the temporary controller by getting the
-        bounding box of the child object
+        bounding box of the child object and multiplying it against
+        the size parameter.
         """
-
         # The exact world bounding box command returns a list with the
         # minimum and maximum coordinates of each axis
         bb_min_x, bb_min_y, bb_min_z, bb_max_x, bb_max_y, bb_max_z = (
@@ -701,6 +704,7 @@ class TempControl():
             cmds.warning(f"The child object '{self.child_object}'" +
                          "has locked transformation channels: " +
                          str(self.locked_transforms))
+            return None
         self._create_cc_shape()
         self._create_hierarchy(master_grp=master_grp)
         self._get_time_range()
@@ -710,12 +714,19 @@ class TempControl():
 
 
 class SpaceSwitcher():
+    """A class made chiefly to handle storing TempControl objects in
+    the UI's 'memory', allowing the user to optionally continue to edit
+    existing temp controllers after their creation, namely in the form
+    of deleting or baking down the controllers."""
     def __init__(self):
         self.master_grp = "__space_switch_master__"
         self.temp_controllers = []
 
     def create_new_temp_ctrl(self, loc, rot, scl, aim, color, shape, size,
                              orient, orient_negative, time_range, smart_bake):
+        """The main function of SpaceSwitcher, which creates a new temp
+        controller, parents it under a master group node, and adds it to
+        memory to be referred to later."""
         new_temp_ctrl = TempControl(loc=loc, rot=rot, scl=scl, aim=aim,
                                     color=color, shape=shape, size=size,
                                     orient=orient, time_range=time_range,

@@ -31,21 +31,15 @@ class SpaceSwitcherUI(QtWidgets.QDialog):
     def _create_script_jobs(self):
         """
         Class that creates script jobs, which allow the GUI to
-        react to user input that occurs in Maya.
+        react to user input that occurs in Maya. In the future,
+        I'd like to implement more script jobs to update the GUI
+        in case of undoing, redoing, deleting, etc., but currently it just
+        supports updating the selection labels.
         """
         self.script_jobs = []
         self.sel_labels_sj = cmds.scriptJob(event=["SelectionChanged",
                                             self._update_sel_labels])
         self.script_jobs.append(self.sel_labels_sj)
-
-        self.update_on_undo_sj = cmds.scriptJob(
-            event=["Undo", self._update_tmp_cc_stack])
-        self.script_jobs.append(self.update_on_undo_sj)
-
-        self.update_on_redo_sj = cmds.scriptJob(
-            event=["Redo", self._update_tmp_cc_stack])
-        self.script_jobs.append(self.update_on_redo_sj)
-
 
     def closeEvent(self, event):
         """
